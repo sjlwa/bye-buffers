@@ -7,17 +7,46 @@
   "Hide buffers from buffer cycling."
   :group 'convenience)
 
+;; Early declarations
+(defvar bye-buffers-list nil)
+(defvar bye-buffers-show-list nil)
+
+(defvar bye-buffers--regexp nil
+  "Cached combined regexp built from `bye-buffers-list'.")
+
+(defvar bye-buffers-show--regexp nil
+  "Cached combined regexp built from `bye-buffers-show-list'.")
+
+(defun bye-buffers-build-regexp (patterns)
+  "Build a combined regexp from PATTERNS."
+  (when patterns
+    (concat "\\(?:"
+            (mapconcat #'identity patterns "\\|")
+            "\\)")))
+
+(defun bye-buffers-refresh ()
+  "Rebuild internal regexp caches."
+  (setq bye-buffers--regexp
+        (bye-buffers-build-regexp bye-buffers-list)
+        bye-buffers-show--regexp
+        (bye-buffers-build-regexp bye-buffers-show-list)))
+
+(defun bye-buffers--set-and-refresh (symbol value)
+  "Set SYMBOL to VALUE and refresh regexp caches."
+  (set-default symbol value)
+  (bye-buffers-refresh))
+
 (defcustom bye-buffers-list nil
   "List of regexps matching buffers to hide.
-
 Each entry must be a valid regexp string."
+  :set #'bye-buffers--set-and-refresh
   :type '(repeat string)
   :group 'bye-buffers)
 
 (defcustom bye-buffers-show-list nil
-    "List of regexps matching buffers to ignore hidden visibility.
-
+  "List of regexps matching buffers that should always be shown.
 Each entry must be a valid regexp string."
+  :set #'bye-buffers--set-and-refresh
   :type '(repeat string)
   :group 'bye-buffers)
 
@@ -26,33 +55,12 @@ Each entry must be a valid regexp string."
   :type '(repeat function)
   :group 'bye-buffers)
 
-(defvar bye-buffers--regexp nil
-  "Cached combined regexp built from `bye-buffers-list`.")
-
-(defvar bye-buffers-show--regexp nil
-  "Cached combined regexp built from `bye-buffers-show-list`.")
-
-(defun bye-buffers-refresh ()
-  "Rebuild internal regexp cache."
-  (setq bye-buffers--regexp
-        (when bye-buffers-list
-          (concat
-           "\\(?:"
-           (mapconcat #'identity bye-buffers-list "\\|")
-           "\\)")))
-  (setq bye-buffers-show--regexp
-        (when bye-buffers-show-list
-          (concat
-           "\\(?:"
-           (mapconcat #'identity bye-buffers-show-list "\\|")
-           "\\)"))))
-
 (defun bye-buffers-hide-re (patterns)
   "Add PATTERNS to `bye-buffers-list`.
 
 PATTERNS must be a list of regexp strings."
   (setq bye-buffers-list
-        (nconc bye-buffers-list patterns))
+        (append bye-buffers-list patterns))
   (bye-buffers-refresh))
 
 (defun bye-buffers-show-re (patterns)
@@ -60,18 +68,16 @@ PATTERNS must be a list of regexp strings."
 
 PATTERNS must be a list of regexp strings."
   (setq bye-buffers-show-list
-        (nconc bye-buffers-show-list patterns))
+        (append bye-buffers-show-list patterns))
   (bye-buffers-refresh))
 
 (defun bye-buffers-hide (patterns)
   "Add substring matching PATTERNS to `bye-buffers-list`."
-  (bye-buffers-hide-re
-   (mapcar #'regexp-quote patterns)))
+  (bye-buffers-hide-re (mapcar #'regexp-quote patterns)))
 
 (defun bye-buffers-show (patterns)
   "Add substring matching PATTERNS to `bye-buffers-show-list`."
-  (bye-buffers-show-re
-   (mapcar #'regexp-quote patterns)))
+  (bye-buffers-show-re (mapcar #'regexp-quote patterns)))
 
 (defun bye-buffers-match-p (buffer-name regexp)
   "Return non-nil if BUFFER-NAME matches REGEXP."
